@@ -1,0 +1,17 @@
+REPOSITORY                                      TAG             IMAGE ID       CREATED          SIZE
+cvat.pth.facebookresearch.sam.vit_h             latest          be8b8e2fea5a   30 minutes ago   12.2GB
+cvat.openvino.base                              latest          a0110b87926b   37 minutes ago   1.43GB
+cvat/ui                                         dev             705b87c3f04c   2 hours ago      122MB
+cvat/server                                     dev             03126b8e603a   2 hours ago      1.28GB
+postgres                                        15-alpine       701535775237   5 days ago       273MB
+gcr.io/iguazio/alpine                           3.17            775f483016a7   3 months ago     7.08MB
+openpolicyagent/opa                             0.63.0          593445863d9e   8 months ago     76.5MB
+quay.io/nuclio/uhttpc                           0.0.1-amd64     356efc45e263   8 months ago     4.85MB
+quay.io/nuclio/dashboard                        1.13.0-amd64    bdb458409deb   9 months ago     251MB
+quay.io/nuclio/handler-builder-python-onbuild   1.13.0-amd64    cd525f994014   9 months ago     68.6MB
+clickhouse/clickhouse-server                    23.11-alpine    769544382e1a   10 months ago    910MB
+traefik                                         v2.10           ee69e8120b64   10 months ago    153MB
+apache/kvrocks                                  2.7.0           373063f3f9d4   12 months ago    37.3MB
+redis                                           7.2.3-alpine    d2d4688fcebe   12 months ago    41MB
+grafana/grafana-oss                             10.1.2          31656ec60d2e   14 months ago    391MB
+timberio/vector                                 0.26.0-alpine   d8ecc9831523   2 years ago      122MB
