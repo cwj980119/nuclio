@@ -1,0 +1,97 @@
+import os
+import json
+import torch
+import cv2
+import numpy as np
+from pycocotools import mask as coco_mask
+from segment_anything import sam_model_registry, SamPredictor
+from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm
+
+class CustomDataset(Dataset):
+    def __init__(self, annotation_path, image_dir):
+        with open(annotation_path, 'r') as f:
+            self.coco_data = json.load(f)
+        self.image_dir = image_dir
+        self.image_ids = [img['id'] for img in self.coco_data['images']]
+        self.id_to_filename = {img['id']: img['file_name'] for img in self.coco_data['images']}
+        self.annotations = self.coco_data['annotations']
+
+    def __len__(self):
+        return len(self.image_ids)
+
+    def __getitem__(self, idx):
+        image_id = self.image_ids[idx]
+        filename = self.id_to_filename[image_id]
+        image_path = os.path.join(self.image_dir, filename)
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        masks = []
+        bboxes = []
+        for ann in self.annotations:
+            if ann['image_id'] == image_id:
+                mask = coco_mask.decode(ann['segmentation'])
+                masks.append(mask)
+                bboxes.append(ann['bbox'])
+
+        return image, masks, bboxes
+
+def train_sam(model, dataset, device, num_epochs=10, lr=1e-5):
+    model.to(device)
+    model.train()
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    loss_fn = torch.nn.BCEWithLogitsLoss()
+
+    for epoch in range(num_epochs):
+        total_loss = 0
+        for image, masks, bboxes in tqdm(dataset):
+            image = torch.from_numpy(image).permute(2, 0, 1).float().to(device)
+            image = model.preprocess(image[None, :, :, :])
+            
+            with torch.no_grad():
+                image_embedding = model.image_encoder(image)
+
+            for mask, bbox in zip(masks, bboxes):
+                mask_tensor = torch.from_numpy(mask).float().to(device)
+                bbox_tensor = torch.tensor(bbox, dtype=torch.float, device=device)
+
+                sparse_embeddings, dense_embeddings = model.prompt_encoder(
+                    points=None,
+                    boxes=bbox_tensor[None, :],
+                    masks=None,
+                )
+
+                low_res_masks, _ = model.mask_decoder(
+                    image_embeddings=image_embedding,
+                    image_pe=model.prompt_encoder.get_dense_pe(),
+                    sparse_prompt_embeddings=sparse_embeddings,
+                    dense_prompt_embeddings=dense_embeddings,
+                    multimask_output=False,
+                )
+
+                loss = loss_fn(low_res_masks, mask_tensor[None, None, :, :])
+                total_loss += loss.item()
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss/len(dataset)}")
+
+if __name__ == "__main__":
+    annotation_path = "path/to/your/coco_annotations.json"
+    image_dir = "path/to/your/image/directory"
+    checkpoint = "path/to/sam_vit_h_4b8939.pth"
+
+    dataset = CustomDataset(annotation_path, image_dir)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = sam_model_registry["vit_h"](checkpoint=checkpoint)
+
+    train_sam(model, dataloader, device)
+
+    # Save the fine-tuned model
+    torch.save(model.state_dict(), "fine_tuned_sam_model.pth")
